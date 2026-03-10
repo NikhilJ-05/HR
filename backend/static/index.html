@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Attrition ML Tester</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen font-sans antialiased text-gray-900">
+
+    <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+        <!-- Left Column: Input Form -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+            <div class="mb-6 border-b pb-4 flex justify-between items-center">
+                <div>
+                    <h2
+                        class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                        Employee Data Input</h2>
+                    <p class="text-sm text-gray-500">Provide all 30 features. Model will auto-generate 6 derived
+                        features.</p>
+                </div>
+                <button id="loadDemoBtn"
+                    class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded-md transition border border-gray-300">
+                    Load Demo Row
+                </button>
+            </div>
+
+            <form id="predictionForm" class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                <!-- Numeric Inputs -->
+                <div><label class="block font-medium mb-1">Age</label><input type="number" id="Age"
+                        class="w-full border rounded p-2 bg-gray-50" value="35"></div>
+                <div><label class="block font-medium mb-1">DailyRate</label><input type="number" id="DailyRate"
+                        class="w-full border rounded p-2 bg-gray-50" value="800"></div>
+                <div><label class="block font-medium mb-1">DistanceFromHome</label><input type="number"
+                        id="DistanceFromHome" class="w-full border rounded p-2 bg-gray-50" value="10"></div>
+                <div><label class="block font-medium mb-1">HourlyRate</label><input type="number" id="HourlyRate"
+                        class="w-full border rounded p-2 bg-gray-50" value="65"></div>
+                <div><label class="block font-medium mb-1">MonthlyIncome</label><input type="number" id="MonthlyIncome"
+                        class="w-full border rounded p-2 bg-gray-50" value="5000"></div>
+                <div><label class="block font-medium mb-1">MonthlyRate</label><input type="number" id="MonthlyRate"
+                        class="w-full border rounded p-2 bg-gray-50" value="15000"></div>
+                <div><label class="block font-medium mb-1">NumCompaniesWorked</label><input type="number"
+                        id="NumCompaniesWorked" class="w-full border rounded p-2 bg-gray-50" value="3"></div>
+                <div><label class="block font-medium mb-1">PercentSalaryHike</label><input type="number"
+                        id="PercentSalaryHike" class="w-full border rounded p-2 bg-gray-50" value="14"></div>
+                <div><label class="block font-medium mb-1">TotalWorkingYears</label><input type="number"
+                        id="TotalWorkingYears" class="w-full border rounded p-2 bg-gray-50" value="10"></div>
+                <div><label class="block font-medium mb-1">TrainingTimesLastYear</label><input type="number"
+                        id="TrainingTimesLastYear" class="w-full border rounded p-2 bg-gray-50" value="2"></div>
+                <div><label class="block font-medium mb-1">YearsAtCompany</label><input type="number"
+                        id="YearsAtCompany" class="w-full border rounded p-2 bg-gray-50" value="5"></div>
+                <div><label class="block font-medium mb-1">YearsInCurrentRole</label><input type="number"
+                        id="YearsInCurrentRole" class="w-full border rounded p-2 bg-gray-50" value="4"></div>
+                <div><label class="block font-medium mb-1">YearsSinceLastPromotion</label><input type="number"
+                        id="YearsSinceLastPromotion" class="w-full border rounded p-2 bg-gray-50" value="1"></div>
+                <div><label class="block font-medium mb-1">YearsWithCurrManager</label><input type="number"
+                        id="YearsWithCurrManager" class="w-full border rounded p-2 bg-gray-50" value="3"></div>
+
+                <!-- Ordinal Inputs (treated as numeric) -->
+                <div><label class="block font-medium mb-1">Education (1-5)</label><input type="number" id="Education"
+                        min="1" max="5" class="w-full border rounded p-2 bg-gray-50" value="3"></div>
+                <div><label class="block font-medium mb-1">Env Satisfaction (1-4)</label><input type="number"
+                        id="EnvironmentSatisfaction" min="1" max="4" class="w-full border rounded p-2 bg-gray-50"
+                        value="2"></div>
+                <div><label class="block font-medium mb-1">Job Involvement (1-4)</label><input type="number"
+                        id="JobInvolvement" min="1" max="4" class="w-full border rounded p-2 bg-gray-50" value="3">
+                </div>
+                <div><label class="block font-medium mb-1">Job Level (1-5)</label><input type="number" id="JobLevel"
+                        min="1" max="5" class="w-full border rounded p-2 bg-gray-50" value="2"></div>
+                <div><label class="block font-medium mb-1">Job Satisfaction (1-4)</label><input type="number"
+                        id="JobSatisfaction" min="1" max="4" class="w-full border rounded p-2 bg-gray-50" value="2">
+                </div>
+                <div><label class="block font-medium mb-1">Performance (3-4)</label><input type="number"
+                        id="PerformanceRating" min="3" max="4" class="w-full border rounded p-2 bg-gray-50" value="3">
+                </div>
+                <div><label class="block font-medium mb-1">Rel Satisfaction (1-4)</label><input type="number"
+                        id="RelationshipSatisfaction" min="1" max="4" class="w-full border rounded p-2 bg-gray-50"
+                        value="3"></div>
+                <div><label class="block font-medium mb-1">Stock Option Level (0-3)</label><input type="number"
+                        id="StockOptionLevel" min="0" max="3" class="w-full border rounded p-2 bg-gray-50" value="1">
+                </div>
+                <div><label class="block font-medium mb-1">Work/Life Balance (1-4)</label><input type="number"
+                        id="WorkLifeBalance" min="1" max="4" class="w-full border rounded p-2 bg-gray-50" value="2">
+                </div>
+
+                <!-- Categorical Inputs -->
+                <div class="col-span-2 mt-2 pt-2 border-t font-semibold text-gray-700">Categorical Features</div>
+
+                <div><label class="block font-medium mb-1">Department</label>
+                    <select id="Department" class="w-full border rounded p-2 bg-gray-50">
+                        <option value="Research & Development">Research & Development</option>
+                        <option value="Sales">Sales</option>
+                        <option value="Human Resources">Human Resources</option>
+                    </select>
+                </div>
+                <div><label class="block font-medium mb-1">Job Role</label>
+                    <select id="JobRole" class="w-full border rounded p-2 bg-gray-50">
+                        <option value="Laboratory Technician">Laboratory Technician</option>
+                        <option value="Research Scientist">Research Scientist</option>
+                        <option value="Sales Executive">Sales Executive</option>
+                        <option value="Manufacturing Director">Manufacturing Director</option>
+                        <option value="Healthcare Representative">Healthcare Representative</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Sales Representative">Sales Representative</option>
+                        <option value="Research Director">Research Director</option>
+                        <option value="Human Resources">Human Resources</option>
+                    </select>
+                </div>
+
+                <div><label class="block font-medium mb-1">OverTime</label>
+                    <select id="OverTime"
+                        class="w-full border rounded p-2 bg-blue-50 border-blue-300 font-bold text-blue-800">
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                    </select>
+                </div>
+                <div><label class="block font-medium mb-1">Business Travel</label>
+                    <select id="BusinessTravel" class="w-full border rounded p-2 bg-gray-50">
+                        <option value="Travel_Rarely">Travel_Rarely</option>
+                        <option value="Travel_Frequently">Travel_Frequently</option>
+                        <option value="Non-Travel">Non-Travel</option>
+                    </select>
+                </div>
+
+                <div><label class="block font-medium mb-1">Education Field</label>
+                    <select id="EducationField" class="w-full border rounded p-2 bg-gray-50">
+                        <option value="Life Sciences">Life Sciences</option>
+                        <option value="Medical">Medical</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Technical Degree">Technical Degree</option>
+                        <option value="Human Resources">Human Resources</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div><label class="block font-medium mb-1">Marital Status</label>
+                    <select id="MaritalStatus" class="w-full border rounded p-2 bg-gray-50">
+                        <option value="Married">Married</option>
+                        <option value="Single">Single</option>
+                        <option value="Divorced">Divorced</option>
+                    </select>
+                </div>
+                <div><label class="block font-medium mb-1">Gender</label>
+                    <select id="Gender" class="w-full border rounded p-2 bg-gray-50">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                </div>
+
+                <div class="col-span-2 mt-4">
+                    <button type="submit"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition duration-200 transform hover:-translate-y-0.5"
+                        id="submitBtn">
+                        Run ML Inference
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Right Column: Results & SHAP -->
+        <div class="flex flex-col gap-6">
+
+            <!-- Risk Score Card -->
+            <div
+                class="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col items-center justify-center text-center relative overflow-hidden h-64">
+                <div class="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 z-0"></div>
+                <div id="loadingOverlay"
+                    class="absolute inset-0 bg-white/80 z-20 flex items-center justify-center hidden">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+                </div>
+
+                <div class="relative z-10 w-full" id="resultContainer">
+                    <h3 class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-2">Attrition Risk Score</h3>
+                    <div class="flex items-end justify-center gap-2 mb-2">
+                        <span id="scoreValue" class="text-6xl font-extrabold text-gray-300">--</span>
+                        <span class="text-2xl font-bold text-gray-400 mb-1">%</span>
+                    </div>
+                    <div id="riskBadge"
+                        class="inline-block px-4 py-1 rounded-full text-sm font-bold bg-gray-200 text-gray-500 mt-2">
+                        Awaiting Input
+                    </div>
+                    <p id="thresholdMeta" class="text-xs text-gray-400 mt-4 h-4"></p>
+                </div>
+            </div>
+
+            <!-- SHAP Explanation Card -->
+            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex-grow">
+                <h3 class="text-lg font-bold border-b pb-3 mb-4 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    Mathematical Risk Drivers (SHAP)
+                </h3>
+                <div class="text-sm text-gray-500 mb-4 h-10" id="shapSubtext">
+                    Run inference to see exactly *why* the XGBoost model assigned this score.
+                </div>
+
+                <div class="h-64 w-full relative">
+                    <canvas id="shapChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chartInstance = null;
+
+        document.getElementById('loadDemoBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('loadDemoBtn');
+            const originalText = btn.innerText;
+            btn.innerText = "Loading...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/random-employee');
+                if (!res.ok) throw new Error("Failed to fetch random row");
+                const randomProfile = await res.json();
+
+                for (const [key, value] of Object.entries(randomProfile)) {
+                    const el = document.getElementById(key);
+                    if (el) el.value = value;
+                }
+            } catch (e) {
+                alert("Error loading demo row: " + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        });
+
+        document.getElementById('predictionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // UI Loading State
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Analyzing...";
+            loadingOverlay.classList.remove('hidden');
+
+            // Gather all 30 inputs
+            const formData = {};
+            const inputs = e.target.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                // Convert numeric values
+                formData[input.id] = input.type === 'number' ? Number(input.value) : input.value;
+            });
+
+            try {
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+
+                if (!response.ok) throw new Error(await response.text());
+
+                const result = await response.json();
+                updateDashboard(result);
+
+            } catch (error) {
+                alert("Error running inference: " + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Run ML Inference";
+                loadingOverlay.classList.hidden = true;
+                setTimeout(() => loadingOverlay.classList.add('hidden'), 300);
+            }
+        });
+
+        function updateDashboard(data) {
+            // 1. Update Dial
+            const scoreEl = document.getElementById('scoreValue');
+            const badgeEl = document.getElementById('riskBadge');
+
+            scoreEl.innerText = data.risk_score.toFixed(1);
+
+            let colorClass = "from-green-500 to-green-600";
+            let textClass = "text-green-600";
+            let bgClass = "bg-green-100 text-green-800";
+
+            if (data.risk_tier === "High") {
+                colorClass = "from-red-500 to-red-600";
+                textClass = "text-red-600";
+                bgClass = "bg-red-100 text-red-800 border border-red-200 shadow-[0_0_15px_rgba(239,68,68,0.5)]";
+            } else if (data.risk_tier === "Medium") {
+                colorClass = "from-yellow-500 to-amber-500";
+                textClass = "text-amber-600";
+                bgClass = "bg-amber-100 text-amber-800 border border-amber-200";
+            }
+
+            scoreEl.className = `text-6xl font-extrabold bg-clip-text text-transparent bg-gradient-to-b ${colorClass}`;
+            badgeEl.className = `inline-block px-6 py-2 rounded-full text-md font-bold transition-all duration-500 ${bgClass}`;
+            badgeEl.innerText = `${data.risk_tier} Flight Risk`;
+
+            document.getElementById('thresholdMeta').innerText =
+                `Optimal Decision Threshold used: ${data.optimal_threshold_used.toFixed(2)}`;
+
+            // 2. Render SHAP Chart
+            document.getElementById('shapSubtext').innerHTML =
+                `Top 5 features affecting this outcome. Positive values pull risk <span class="font-bold text-red-500">Higher +</span>, negative pull risk <span class="font-bold text-green-500">Lower -</span>. Note: Some features are dynamically inferred (e.g., StagnationScore).`;
+
+            renderChart(data.top_factors);
+        }
+
+        function renderChart(factors) {
+            const ctx = document.getElementById('shapChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            // Parse factors
+            const labels = factors.map(f => f.feature);
+            const data = factors.map(f => {
+                const val = parseFloat(f.impact.substring(1));
+                return f.impact.startsWith('+') ? val : -val;
+            });
+
+            // Colors based on positive/negative
+            const colors = data.map(val => val > 0 ? 'rgba(239, 68, 68, 0.8)' : 'rgba(34, 197, 94, 0.8)');
+            const borders = data.map(val => val > 0 ? 'rgba(220, 38, 38, 1)' : 'rgba(22, 163, 74, 1)');
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'SHAP Log-Odds Impact',
+                        data: data,
+                        backgroundColor: colors,
+                        borderColor: borders,
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y', // Horizontal bar chart
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return ` Impact: ${context.raw > 0 ? '+' : ''}${context.raw.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            title: { display: true, text: 'Relative Impact' }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>
