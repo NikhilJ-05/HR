@@ -7,14 +7,21 @@
     <title>HR Attrition ML Tester</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Chat Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+    </style>
 </head>
 
 <body class="bg-gray-100 min-h-screen font-sans antialiased text-gray-900">
 
-    <div class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div class="w-[98%] max-w-[1800px] mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-screen">
 
         <!-- Left Column: Input Form -->
-        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+        <div class="lg:col-span-4 bg-white p-6 rounded-xl shadow-md border border-gray-200 h-fit">
             <div class="mb-6 border-b pb-4 flex justify-between items-center">
                 <div>
                     <h2
@@ -30,6 +37,15 @@
             </div>
 
             <form id="predictionForm" class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                <!-- Submit Button moved to top -->
+                <div class="col-span-2 mb-2">
+                    <button type="submit"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition duration-200 transform hover:-translate-y-0.5"
+                        id="submitBtn">
+                        Run ML Inference
+                    </button>
+                </div>
+
                 <!-- Numeric Inputs -->
                 <div><label class="block font-medium mb-1">Age</label><input type="number" id="Age"
                         class="w-full border rounded p-2 bg-gray-50" value="35"></div>
@@ -150,22 +166,17 @@
                     </select>
                 </div>
 
-                <div class="col-span-2 mt-4">
-                    <button type="submit"
-                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition duration-200 transform hover:-translate-y-0.5"
-                        id="submitBtn">
-                        Run ML Inference
-                    </button>
-                </div>
+                <!-- Submit button was moved to the top of the form -->
             </form>
         </div>
 
         <!-- Right Column: Results & SHAP -->
-        <div class="flex flex-col gap-6">
+        <div class="lg:col-span-8 flex flex-col gap-6">
 
-            <!-- Risk Score Card -->
-            <div
-                class="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col items-center justify-center text-center relative overflow-hidden h-64">
+            <!-- Top Row: Metrics -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 shrink-0">
+                <!-- Risk Score Card -->
+                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex flex-col items-center justify-center text-center relative overflow-hidden h-full min-h-[300px]">
                 <div class="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 z-0"></div>
                 <div id="loadingOverlay"
                     class="absolute inset-0 bg-white/80 z-20 flex items-center justify-center hidden">
@@ -186,21 +197,52 @@
                 </div>
             </div>
 
-            <!-- SHAP Explanation Card -->
-            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex-grow">
-                <h3 class="text-lg font-bold border-b pb-3 mb-4 flex items-center gap-2">
-                    <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                    </svg>
-                    Mathematical Risk Drivers (SHAP)
-                </h3>
-                <div class="text-sm text-gray-500 mb-4 h-10" id="shapSubtext">
-                    Run inference to see exactly *why* the XGBoost model assigned this score.
-                </div>
+                <!-- SHAP Explanation Card -->
+                <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 h-full flex flex-col min-h-[300px]">
+                    <h3 class="text-base font-bold border-b pb-2 mb-2 flex items-center gap-2 shrink-0">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        Mathematical Risk Drivers (SHAP)
+                    </h3>
+                    <div class="text-xs text-gray-500 mb-2 shrink-0" id="shapSubtext">
+                        Run inference to see exactly *why* the XGBoost model assigned this score.
+                    </div>
 
-                <div class="h-64 w-full relative">
-                    <canvas id="shapChart"></canvas>
+                    <div class="flex-grow w-full relative min-h-[200px] pb-2">
+                        <canvas id="shapChart"></canvas>
+                    </div>
+                </div>
+            </div> <!-- Close Top Row Metrics -->
+
+            <!-- AI Insights Card -->
+            <div class="bg-gradient-to-br from-indigo-900 to-purple-900 p-6 rounded-xl shadow-xl border border-indigo-700 text-white flex flex-col min-h-[500px]" id="aiInsightsCard" style="display: none;">
+                <h3 class="text-xl font-bold border-b border-indigo-500/50 pb-3 mb-4 flex items-center gap-2 shrink-0">
+                    <svg class="w-6 h-6 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                    </svg>
+                    AI Strategic Consultant
+                </h3>
+                <div class="flex flex-col flex-grow min-h-0">
+                    <!-- Chat History Container -->
+                    <div id="chatHistory" class="flex-grow overflow-y-auto space-y-4 mb-4 pr-2 custom-scrollbar">
+                        <!-- Messages render here -->
+                    </div>
+                    
+                    <!-- Quick Replies -->
+                    <div id="quickReplies" class="flex flex-col gap-2 mb-3 hidden shrink-0">
+                        <!-- Dynamic buttons injected here -->
+                    </div>
+                    
+                    <!-- Input Box -->
+                    <div class="flex gap-2 shrink-0">
+                        <input type="text" id="chatInput" placeholder="Ask follow-up questions..." class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-400 placeholder-indigo-300">
+                        <button id="chatSendBtn" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg font-bold transition flex items-center justify-center min-w-[70px]">
+                            <span id="chatSendText">Send</span>
+                            <div id="chatLoading" class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -208,6 +250,9 @@
 
     <script>
         let chartInstance = null;
+        let globalEmployeeData = null;
+        let globalMlAnalysis = null;
+        let currentChatHistory = [];
 
         document.getElementById('loadDemoBtn').addEventListener('click', async () => {
             const btn = document.getElementById('loadDemoBtn');
@@ -251,7 +296,7 @@
             });
 
             try {
-                const response = await fetch('/api/predict', {
+                const response = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(formData)
@@ -260,7 +305,12 @@
                 if (!response.ok) throw new Error(await response.text());
 
                 const result = await response.json();
-                updateDashboard(result);
+                
+                // Map the full analysis payload to the dashboard
+                const mlData = result.ml_analysis;
+                mlData.top_factors = mlData.top_drivers; // Compatibility mapping
+                updateDashboard(mlData);
+                updateAIInsights(result.ai_insights, mlData, formData);
 
             } catch (error) {
                 alert("Error running inference: " + error.message);
@@ -298,7 +348,7 @@
             badgeEl.innerText = `${data.risk_tier} Flight Risk`;
 
             document.getElementById('thresholdMeta').innerText =
-                `Optimal Decision Threshold used: ${data.optimal_threshold_used.toFixed(2)}`;
+                `Optimal Decision Threshold used: ${(data.optimal_threshold_used || 0.66).toFixed(2)}`;
 
             // 2. Render SHAP Chart
             document.getElementById('shapSubtext').innerHTML =
@@ -363,6 +413,159 @@
                     }
                 }
             });
+        }
+
+        function parseMd(text) {
+            if (!text) return '';
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        }
+
+        function updateAIInsights(aiData, mlData, empData) {
+            globalEmployeeData = empData;
+            globalMlAnalysis = mlData;
+
+            const card = document.getElementById('aiInsightsCard');
+            const chatHistoryEl = document.getElementById('chatHistory');
+            const quickRepliesEl = document.getElementById('quickReplies');
+
+            card.style.display = 'block';
+            chatHistoryEl.innerHTML = '';
+            quickRepliesEl.innerHTML = '';
+
+            if (aiData.suggested_questions && Array.isArray(aiData.suggested_questions)) {
+                aiData.suggested_questions.forEach(q => {
+                    const btn = document.createElement('button');
+                    btn.className = "text-[11px] text-indigo-200 bg-indigo-800/60 hover:bg-indigo-700 px-2.5 py-1.5 rounded border border-indigo-500/30 transition text-left flex-grow-0 w-max max-w-full leading-tight shadow-sm";
+                    btn.innerText = "↳ " + q;
+                    btn.onclick = () => {
+                        sendQuickReply(q);
+                        quickRepliesEl.classList.add('hidden'); // Hide after clicking
+                    };
+                    quickRepliesEl.appendChild(btn);
+                });
+                quickRepliesEl.classList.remove('hidden');
+            } else {
+                quickRepliesEl.classList.add('hidden');
+            }
+
+            const initialNarrative = `<strong>Diagnostic Summary:</strong><br/>${parseMd(aiData.risk_narrative)}`;
+            const initialStrategies = `<strong>Recommended Interventions:</strong><br/><ul class="list-disc list-inside mt-2 space-y-1">` + 
+                (aiData.retention_strategies || []).map(s => `<li>${parseMd(s)}</li>`).join('') + `</ul>`;
+            
+            const fullInitialMessage = initialNarrative + '<br/><br/>' + initialStrategies;
+            
+            currentChatHistory = [{ role: 'assistant', content: fullInitialMessage }];
+            appendMessage('assistant', fullInitialMessage, true);
+        }
+
+        function appendMessage(role, content, isHtml = false) {
+            const chatHistoryEl = document.getElementById('chatHistory');
+            const msgDiv = document.createElement('div');
+            
+            if (role === 'user') {
+                msgDiv.className = "bg-indigo-600/60 text-white p-3 rounded-lg rounded-tr-none ml-8 text-sm border border-indigo-500/30";
+                msgDiv.innerText = content;
+            } else {
+                msgDiv.className = "bg-white/10 text-gray-100 p-3 rounded-lg rounded-tl-none mr-8 text-sm leading-relaxed border border-white/5";
+                if (isHtml) {
+                    msgDiv.innerHTML = content;
+                    msgDiv.style.opacity = 0;
+                    msgDiv.style.transition = 'opacity 0.5s ease-in';
+                    setTimeout(() => msgDiv.style.opacity = 1, 50);
+                } else {
+                    // For markdown standard text from groq
+                    let parsedContent = parseMd(content);
+                    msgDiv.innerHTML = parsedContent.replace(/\n(.*)/g, '<br/>$1');
+                }
+            }
+            chatHistoryEl.appendChild(msgDiv);
+            chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+        }
+
+        function renderQuickReplies(questions) {
+            const quickRepliesEl = document.getElementById('quickReplies');
+            quickRepliesEl.innerHTML = '';
+            
+            if (questions && Array.isArray(questions) && questions.length > 0) {
+                questions.forEach(q => {
+                    const btn = document.createElement('button');
+                    btn.className = "text-[11px] text-indigo-200 bg-indigo-800/60 hover:bg-indigo-700 px-2.5 py-1.5 rounded border border-indigo-500/30 transition text-left flex-grow-0 w-max max-w-full leading-tight shadow-sm";
+                    btn.innerText = "↳ " + q;
+                    btn.onclick = () => {
+                        sendQuickReply(q);
+                        quickRepliesEl.classList.add('hidden');
+                    };
+                    quickRepliesEl.appendChild(btn);
+                });
+                quickRepliesEl.classList.remove('hidden');
+            } else {
+                quickRepliesEl.classList.add('hidden');
+            }
+        }
+
+        async function sendChatMessage(text) {
+            if (!text || !text.trim()) return;
+            
+            appendMessage('user', text);
+            document.getElementById('chatInput').value = '';
+            currentChatHistory.push({ role: 'user', content: text });
+            
+            const btnText = document.getElementById('chatSendText');
+            const btnLoading = document.getElementById('chatLoading');
+            const btn = document.getElementById('chatSendBtn');
+            btnText.classList.add('hidden');
+            btnLoading.classList.remove('hidden');
+            btn.disabled = true;
+
+            try {
+                // Remove HTML formatting from assistant history to avoid passing tags back to LLM context
+                const cleanHistory = currentChatHistory.map(m => ({
+                    role: m.role,
+                    content: m.content.replace(/<[^>]*>?/gm, '') // Strip HTML for LLM
+                }));
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        employee_data: globalEmployeeData,
+                        ml_analysis: globalMlAnalysis,
+                        messages: cleanHistory
+                    })
+                });
+
+                if (!response.ok) throw new Error("Chat failed");
+                const data = await response.json();
+                
+                currentChatHistory.push({ role: 'assistant', content: data.reply });
+                appendMessage('assistant', data.reply);
+                
+                // Render new quick replies continuously!
+                renderQuickReplies(data.suggested_questions);
+                
+            } catch (err) {
+                appendMessage('assistant', "⚠️ Interrupted: " + err.message);
+                currentChatHistory.pop(); // Remove user msg
+            } finally {
+                btnText.classList.remove('hidden');
+                btnLoading.classList.add('hidden');
+                btn.disabled = false;
+            }
+        }
+
+        document.getElementById('chatSendBtn').addEventListener('click', () => {
+            const input = document.getElementById('chatInput');
+            sendChatMessage(input.value);
+        });
+
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendChatMessage(e.target.value);
+            }
+        });
+
+        function sendQuickReply(text) {
+            sendChatMessage(text);
         }
     </script>
 </body>

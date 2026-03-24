@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import List, Optional
 
 class EmployeeInferenceBase(BaseModel):
     Age: float = Field(..., description="Age in years")
@@ -36,4 +37,40 @@ class PredictionResponse(BaseModel):
     risk_score: float
     risk_tier: str
     optimal_threshold_used: float
+    base_value: float
+    shap_values: list[float]
+    feature_names: list[str]
     top_factors: list[dict]
+
+class RiskDriver(BaseModel):
+    feature: str
+    impact: str
+    raw_impact: Optional[float] = None
+
+class MLAnalysis(BaseModel):
+    risk_score: float
+    risk_tier: str
+    optimal_threshold_used: float
+    base_value: float
+    shap_values: list[float]
+    feature_names: list[str]
+    top_drivers: List[RiskDriver]
+
+class AIInsights(BaseModel):
+    risk_narrative: str
+    retention_strategies: List[str]
+    suggested_questions: List[str]
+
+class FullAnalysisResponse(BaseModel):
+    employee_number: Optional[int] = None
+    ml_analysis: MLAnalysis
+    ai_insights: AIInsights
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    employee_data: dict
+    ml_analysis: dict
+    messages: List[ChatMessage]
