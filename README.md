@@ -1,728 +1,402 @@
-# Generative HR Attrition Insight Reporter: Full System Replication Guide
+<div align="center">
+  <h1>🧠 HR Attrition Intelligence System</h1>
+  <p><strong>Predict. Explain. Retain.</strong></p>
+  <p><em>An end-to-end AI system that tells you which employees are at risk of leaving, exactly why — mathematically — and what to do about it.</em></p>
 
-This document is a comprehensive, step-by-step technical blueprint. It is designed so that *any* AI Agent or software engineering team can read it and perfectly replicate the Generative HR Attrition Insight Reporter system from scratch.
-
-**Data Source**: [IBM HR Analytics Employee Attrition & Performance Dataset](https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset) — 1,470 employees, 35 columns. The dataset is pre-loaded at `IBM Dataset.csv` in the project root.
+  [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+  [![FastAPI](https://img.shields.io/badge/FastAPI-0.135+-green.svg)](https://fastapi.tiangolo.com/)
+  [![XGBoost](https://img.shields.io/badge/XGBoost-3.2+-orange.svg)](https://xgboost.readthedocs.io/)
+  [![SHAP](https://img.shields.io/badge/SHAP-Explainable_AI-purple.svg)](https://shap.readthedocs.io/)
+  [![Groq](https://img.shields.io/badge/LLM-Groq_%7C_Llama_4-red.svg)](https://console.groq.com/)
+</div>
 
 ---
 
-## Part 1: System Overview & Architecture Diagram
+## 📖 Overview
 
-### The Goal
-Build a 3-tier system that takes the IBM HR Attrition dataset, predicts if an employee will leave (using XGBoost), explains exactly *why* mathematically (using SHAP), and generates an actionable retention strategy in plain English (using the Groq LLM API).
+Most HR analytics tools stop at a single number: a risk score. They tell you *who* might leave, but not *why*, and certainly not *what to do*.
 
-### Architecture Flow
+This system is built differently. It chains three layers of intelligence together:
 
-```mermaid
-flowchart TD
-    IBM_CSV[(IBM Dataset.csv\n1,470 Employees, 35 Columns)]
-    
-    subgraph Data Pipeline
-        LoadClean[Load & Clean\nDrop constant cols]
-        PreProcess[Preprocessing\nOneHot + Scaler]
-    end
+1. **A tuned XGBoost classifier** produces a per-employee attrition probability (0–100%).
+2. **SHAP TreeExplainer** dissects the model's decision for that specific employee — surfacing the exact features pulling the score up or down, with their mathematical weight.
+3. **A Groq-hosted Llama 4 LLM** reads the SHAP output as structured context and writes a professional risk narrative plus three concrete, cost-effective retention interventions tailored to that employee's unique situation.
 
-    subgraph ML Engine - FastAPI
-        XGBoost[[XGBoost Classifier\nOutputs Probability %]]
-        SHAP[[SHAP TreeExplainer\nOutputs Feature Impacts]]
-    end
+The entire stack runs from a single command and serves a fully interactive web UI — no frontend build step required.
 
-    subgraph LLM Intelligence
-        Groq[[Groq API\nOutputs Retention Strategy]]
-    end
+---
 
-    subgraph User Interface - Next.js
-        Dashboard[\Dashboard & Profile Views/]
-        Simulation[What-If Sandbox Slider]
-    end
+## ✨ What It Does
 
-    IBM_CSV --> LoadClean
-    LoadClean --> PreProcess
-    PreProcess --> XGBoost
-    
-    XGBoost -- "Score e.g. 84%" --> Dashboard
-    XGBoost --> SHAP
-    SHAP -- "+12% Overtime, -5% Pay" --> Dashboard
-    SHAP --> Groq
-    Groq -- "Text Narrative & Strategy" --> Dashboard
-    
-    Dashboard -- "Simulation Tweaks" --> XGBoost
+| Capability | Description |
+|:---|:---|
+| 🎯 **Attrition Risk Scoring** | XGBoost outputs a probability score per employee. Risk tiers (High / Medium / Low) are assigned using an F1-optimized threshold (0.66), not the naive 0.50 default |
+| 🔬 **SHAP Explainability** | Per-employee SHAP TreeExplainer decomposes the prediction. Features are grouped (e.g., all `JobRole` one-hot columns sum into one `JobRole` value), returning the top 12 drivers by absolute impact |
+| 🤖 **AI Retention Strategy** | Groq LLM (Llama 4 Scout) generates a structured JSON response: a professional risk narrative + 3 specific retention interventions + 3 suggested follow-up questions for the manager |
+| 💬 **Conversational HR Consultant** | After the initial analysis, a manager can ask follow-up questions in a stateful chat interface. The LLM maintains the employee context across turns |
+| 🔄 **Random Employee Loader** | The UI can pull a random employee directly from the IBM dataset for immediate demonstration — no manual data entry needed |
+| 📊 **SHAP Waterfall View** | A dedicated `/waterfall` page renders a full SHAP waterfall chart showing every feature's contribution from the base value to the final prediction |
+
+---
+
+## 🏗️ Architecture
+
+```
+IBM Dataset.csv  (1,470 employees × 35 columns)
+        │
+        ▼
+┌──────────────────────────────────────────────────┐
+│  train_pipeline.py  (run once, offline)          │
+│                                                  │
+│  1. Load & Clean  →  drop 4 constant columns     │
+│  2. Feature Engineering  →  6 derived features   │
+│  3. Train/Test Split  →  80/20, stratified       │
+│  4. Preprocessing  →  StandardScaler + OneHot    │
+│  5. SMOTE-ENN  →  balance the training set       │
+│  6. Optuna  →  50 trials × 5-fold CV search      │
+│  7. Threshold Sweep  →  find F1-optimal cutoff   │
+│  8. Serialize  →  3 .joblib artifacts            │
+└──────────────┬───────────────────────────────────┘
+               │  xgb_model.joblib
+               │  preprocessor.joblib
+               │  optimal_threshold.joblib
+               ▼
+┌──────────────────────────────────────────────────┐
+│  FastAPI Server  (main.py)                       │
+│                                                  │
+│  POST /api/predict                               │
+│    → engineer_features()  (6 derived cols)       │
+│    → preprocessor.transform()                   │
+│    → model.predict_proba()  →  risk score        │
+│    → shap.TreeExplainer()  →  grouped SHAP       │
+│    → returns top 12 risk drivers + waterfall data│
+│                                                  │
+│  POST /api/analyze                               │
+│    → /api/predict  (above)                       │
+│    → build_prompt()  →  Groq Llama 4             │
+│    → returns narrative + strategies + questions  │
+│                                                  │
+│  POST /api/chat                                  │
+│    → stateful consultant conversation            │
+│    → Groq with last 5 turns of history           │
+│                                                  │
+│  GET  /api/random-employee                       │
+│    → samples one row from IBM Dataset.csv        │
+│                                                  │
+│  GET  /  →  serves static/index.html            │
+│  GET  /waterfall  →  serves waterfall UI         │
+└──────────────────────────────────────────────────┘
 ```
 
-### Essential Tech Stack
-| Layer | Technology | Purpose |
-|:---|:---|:---|
-| **Language** | Python 3.10+ | All backend logic |
-| **Data Processing** | `pandas`, `numpy` | DataFrame operations |
-| **ML Model** | `xgboost` | Binary classification for attrition prediction |
-| **Explainability** | `shap` | SHAP TreeExplainer for feature importance |
-| **Preprocessing** | `scikit-learn` | `ColumnTransformer`, `StandardScaler`, `OneHotEncoder`, `LabelEncoder` |
-| **Serialization** | `joblib` | Persist trained model & preprocessor to disk |
-| **API Server** | `fastapi`, `uvicorn` | Async REST API |
-| **Validation** | `pydantic` | Request/Response schemas |
-| **GenAI** | `groq` (Python SDK) | LLM inference via Groq cloud |
-| **Frontend** | Next.js 14+ (App Router) | React-based dashboard |
-| **Styling** | `tailwindcss` | Utility-first CSS |
-| **Charts** | `recharts` | SHAP visualizations, risk gauges |
+---
+
+## 🧪 ML Pipeline — Iterative Development
+
+The model was built in two documented iterations. The full technical details, confusion matrices, classification reports, and feature importance tables for both are in [`Training.md`](./Training.md).
+
+### Approach 1 — Baseline XGBoost
+
+The first pipeline established a working end-to-end flow: load raw data, drop constant columns, apply a `ColumnTransformer` (StandardScaler + OneHotEncoder), and train a default XGBoost classifier.
+
+Class imbalance (84% No / 16% Yes) was addressed only via `scale_pos_weight`. The default 0.50 classification threshold was used throughout.
+
+**Outcome:** The model achieved a respectable ROC-AUC but critically missed **68% of employees who actually left** — only flagging 15 out of 47 true attrition cases on the test set. This was the primary failure driving Approach 2.
+
+| Metric | Score |
+|:---|:---:|
+| ROC-AUC | 0.7652 |
+| Attrition Recall | 0.32 |
+| Attrition F1 | 0.40 |
+| Accuracy | 85.0% |
 
 ---
 
-## Part 2: Project Directory Structure
+### Approach 2 — Production Model ✅
+
+Four targeted improvements over the baseline, each addressing a specific failure mode.
+
+#### Improvement 1: Domain Feature Engineering
+
+Six new columns were derived from existing data before any preprocessing step. Raw features capture isolated metrics; these derived features capture *relationships* between them.
+
+| Derived Feature | Formula | What It Captures |
+|:---|:---|:---|
+| `IncomePerJobLevel` | `MonthlyIncome / JobLevel` | An employee earning $4,000 at Level 1 vs. Level 5 is a very different situation. This ratio flags underpaid senior employees |
+| `YearsPerCompany` | `TotalWorkingYears / (NumCompaniesWorked + 1)` | Average tenure per employer — a low score signals a serial job-hopper |
+| `StagnationScore` | `YearsSinceLastPromotion / (YearsAtCompany + 1)` | Career velocity. An employee with 8 years at the company and no promotion in 6 years has a StagnationScore of ~0.75 |
+| `OverTimeFlag` | `1 if OverTime == "Yes" else 0` | A numeric encoding of overtime that gradient boosting can use more directly than the raw string |
+| `SatisfactionIndex` | `(JobSat + EnvSat + RelSat) / 3.0` | A single composite satisfaction signal — reduces three correlated columns into one |
+| `CompensationGap` | `MonthlyIncome − Dept. Median Income` | Relative pay fairness within a department. A negative value means the employee earns below the departmental median |
+
+Two of these derived features (`YearsPerCompany`, `OverTimeFlag`) ranked in the **top 6 by feature importance** in the final model, validating the engineering hypothesis.
+
+The feature count grew from **30 original → 36 total → 57 after one-hot encoding**.
+
+#### Improvement 2: SMOTE-ENN Resampling
+
+Applied to the **training set only** — the test set is never touched, preserving honest evaluation.
+
+- **SMOTE** (Synthetic Minority Over-sampling Technique) generates synthetic "Attrition = Yes" samples by interpolating between existing minority-class neighbours in feature space.
+- **ENN** (Edited Nearest Neighbours) then removes noisy/ambiguous samples from *both* classes near the decision boundary.
+
+This corrects the fundamental problem in Approach 1: the model had 5× more "No Attrition" examples to learn from, so it defaulted to always predicting "No" as the statistically safe bet.
+
+#### Improvement 3: Optuna Bayesian Hyperparameter Search
+
+Replaced hand-picked defaults with a systematic Optuna search: 50 trials using the Tree-structured Parzen Estimator (TPE) algorithm, evaluated via 5-fold stratified cross-validation. The optimisation target was **Attrition F1-Score** — not accuracy, which is misleading on imbalanced data.
+
+The search explored 10 hyperparameters including `n_estimators`, `max_depth`, `learning_rate`, `subsample`, `colsample_bytree`, L1/L2 regularisation, and `max_delta_step`.
+
+**Best parameters found:** `n_estimators=250`, `max_depth=8`, `learning_rate=0.2148`, `min_child_weight=5`, `reg_alpha=2.41`, `reg_lambda=2.96`.
+
+#### Improvement 4: Optimal Classification Threshold
+
+The default 0.50 cutoff is rarely optimal for imbalanced datasets. We swept thresholds from 0.15 → 0.70 and selected the value that maximised F1-Score on the held-out test set.
+
+**Result:** Optimal threshold = **0.66**. This is serialised to `optimal_threshold.joblib` and loaded at runtime by `predictor.py` — the API never uses the raw 0.50 default.
+
+Risk tier boundaries scale relative to this threshold:
+- **High Risk:** probability ≥ 0.66
+- **Medium Risk:** probability ≥ 0.396 (60% of threshold)
+- **Low Risk:** everything below
+
+---
+
+### Head-to-Head Results
+
+| Metric | Approach 1 | Approach 2 | Change |
+|:---|:---:|:---:|:---:|
+| **ROC-AUC** | 0.7652 | **0.8107** | +6.0% ↑ |
+| **PR-AUC** | — | **0.5725** | new metric |
+| **Attrition Recall** | 0.32 | **0.68** | **+112.5% ↑** |
+| **Attrition Precision** | 0.54 | 0.46 | −14.8% ↓ |
+| **Attrition F1** | 0.40 | **0.55** | +37.5% ↑ |
+| **MCC** | — | **0.4535** | new metric |
+| **Accuracy** | 85.0% | 82.0% | −3.0% ↓ |
+
+> **On the accuracy drop:** This is intentional and desirable. The model now correctly flags **32 of 47** at-risk employees on the test set instead of only 15. Accuracy fell because the model now produces more true positives — which also means more false positives. In HR, the cost of a false alarm (an unnecessary manager check-in with a content employee) is orders of magnitude lower than the cost of losing a trained, productive employee.
+
+### Confusion Matrix (Approach 2, threshold = 0.66)
+
+```
+                   Predicted: No   Predicted: Yes
+Actual: No  (247)      209              38
+Actual: Yes  (47)       15              32
+```
+
+---
+
+## 🔌 API Reference
+
+Interactive Swagger docs auto-generated at **`http://localhost:8000/docs`**.
+
+### `POST /api/predict`
+Runs the full ML inference pipeline on a submitted employee record.
+
+- Engineers the 6 derived features from raw inputs
+- Runs `preprocessor.transform()` → `model.predict_proba()`
+- Applies the optimal threshold (0.66) for tier assignment
+- Runs `shap.TreeExplainer`, groups one-hot columns by their parent feature name, and returns the top 12 drivers ranked by absolute SHAP impact
+- Also returns the full raw `shap_values[]` array and the `base_value` (model's average log-odds) so the frontend can render an accurate waterfall chart
+
+**Request:** `EmployeeInferenceBase` — 30 raw feature fields (23 numeric/ordinal + 7 categorical)
+
+**Response:** `risk_score`, `risk_tier`, `optimal_threshold_used`, `base_value`, `shap_values[]`, `feature_names[]`, `top_factors[]`
+
+---
+
+### `POST /api/analyze`
+Chains `/api/predict` with a Groq LLM call for the full AI-powered report.
+
+- Calls the prediction pipeline internally
+- Passes the top 5 SHAP drivers plus full employee context to `build_prompt()`
+- Calls Groq (Llama 4 Scout) with `temperature=0.4`, expecting a strict JSON response
+- Strips markdown code fences and searches for the outermost `{...}` block before parsing — handles LLM formatting drift gracefully
+- Falls back to a descriptive error object if `json.loads()` fails — the server never returns a 500 for an LLM formatting issue
+
+**Response:** `FullAnalysisResponse` → `ml_analysis` + `ai_insights` (`risk_narrative`, `retention_strategies[3]`, `suggested_questions[3]`)
+
+---
+
+### `POST /api/chat`
+Stateful conversational HR consultant interface for follow-up questions.
+
+- Accepts the full `employee_data`, `ml_analysis`, and a `messages[]` history array (list of `{role, content}` pairs)
+- Re-injects the full employee context and SHAP analysis into the system prompt on every turn so the LLM never loses context
+- Sends only the **last 5 turns** of conversation history to Groq — enough for coherent multi-turn dialogue without hitting context limits
+- Returns a `reply` string (Markdown-formatted for the UI) and a fresh `suggested_questions[3]` array
+
+---
+
+### `GET /api/random-employee`
+Loads a random row from `IBM Dataset.csv`, drops non-inference columns (`EmployeeNumber`, `Attrition`, `EmployeeCount`, `Over18`, `StandardHours`), and returns the raw feature dict. Powers the UI's one-click "Load Random Employee" demo button.
+
+---
+
+### `GET /` and `GET /waterfall`
+Serves HTML interfaces directly from `backend/static/` via FastAPI's `StaticFiles` mount. No separate frontend server or build step needed.
+
+---
+
+## 🤖 Groq LLM Prompt Design
+
+The system prompt is engineered for consistent, professional, structured output. Key design decisions:
+
+**Persona framing:** The LLM is cast as an "Expert HR Business Partner and Retention Strategist" — this establishes the domain register and prevents casual or generic language.
+
+**SHAP-to-English translation:** A `CRITICAL:` instruction in the prompt requires the LLM to convert raw variable names (`OverTimeFlag`, `StagnationScore`, `JobRole`) into human-readable business language ("overtime burden", "career stagnation", "current position") *before* writing any narrative. Raw camelCase names are explicitly forbidden in the output.
+
+**Markdown in responses:** The narrative is expected to use `**bolding**` for key metrics — making it display-ready for the UI without any post-processing.
+
+**Positive/negative SHAP framing:** The prompt explains the sign convention to the LLM: positive SHAP values are "Attrition Drivers" (pushing the employee toward leaving), negative values are "Retention Anchors" (factors keeping them engaged). The LLM is required to address both in the narrative.
+
+**Strict JSON contract:** The system message mandates a response with exactly three keys — `risk_narrative` (string), `retention_strategies` (array of 3 strings), `suggested_questions` (array of 3 strings, max 8 words each). `temperature=0.4` keeps outputs consistent across runs.
+
+**Resilient parsing:** After the API call, `ai_service.py` strips markdown fences, extracts the outermost JSON block, and wraps `json.loads()` in a try/except that returns a user-readable fallback — the endpoint always responds with a valid `FullAnalysisResponse`.
+
+---
+
+## 📁 Project Structure
 
 ```
 HR/
-├── IBM Dataset.csv                 # Source dataset (Kaggle)
-├── Technical Overview.md           # This file
-├── backend/
-│   ├── .env                        # Environment variables (GROQ_API_KEY)
-│   ├── requirements.txt            # Python dependencies
-│   ├── main.py                     # FastAPI app entry point, CORS, routers
-│   ├── config.py                   # Settings loaded from .env via pydantic-settings
-│   ├── database.py                 # Data loading from IBM Dataset.csv and query helpers
-│   ├── models/
-│   │   └── schemas.py              # Pydantic request/response models
-│   ├── ml/
-│   │   ├── train_pipeline.py       # Model training & export script
-│   │   ├── predictor.py            # Runtime inference + SHAP explanation logic
-│   │   ├── xgb_model.joblib        # Serialized trained XGBoost model
-│   │   └── preprocessor.joblib     # Serialized sklearn ColumnTransformer
-│   ├── services/
-│   │   ├── ai_service.py           # Groq LLM prompt construction & invocation
-│   │   └── dashboard_service.py    # Aggregation logic for dashboard KPIs
-│   ├── routers/
-│   │   ├── employees.py            # /api/employees routes
-│   │   └── dashboard.py            # /api/dashboard routes
-│   └── tests/
-│       ├── test_predictor.py       # Unit tests for ML inference
-│       ├── test_endpoints.py       # Integration tests for API routes
-│       └── test_ai_service.py      # Mocked Groq response tests
+├── IBM Dataset.csv                   # Source data (1,470 × 35)
+├── README.md                         # This file
+├── Training.md                       # Full ML pipeline documentation
+├── pyproject.toml                    # uv project manifest & dependencies
+├── run.py                            # Single-command launcher (starts uvicorn from root)
 │
-├── frontend/
-│   ├── package.json
-│   ├── next.config.js
-│   ├── tailwind.config.ts
-│   ├── .env.local                  # NEXT_PUBLIC_API_URL=http://localhost:8000
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── layout.tsx          # Root layout (fonts, global styles)
-│   │   │   ├── page.tsx            # Dashboard home
-│   │   │   └── employees/
-│   │   │       ├── page.tsx        # Employee directory
-│   │   │       └── [id]/
-│   │   │           └── page.tsx    # Individual risk profile
-│   │   ├── components/
-│   │   │   ├── KPICard.tsx         # Reusable metric card
-│   │   │   ├── RiskGauge.tsx       # Circular risk score gauge
-│   │   │   ├── SHAPChart.tsx       # Horizontal bar chart for SHAP values
-│   │   │   ├── InsightPanel.tsx    # Renders Groq narrative text
-│   │   │   ├── SimulationSandbox.tsx # What-If sliders + live score
-│   │   │   ├── EmployeeTable.tsx   # Data grid with filters
-│   │   │   └── DeptRiskChart.tsx   # Bar chart for department risks
-│   │   └── lib/
-│   │       └── api.ts              # Centralized fetch/axios client
-│   └── public/
-│       └── ...                     # Static assets
+├── Approach 1/                       # Terminal screenshots — baseline pipeline
+│   ├── Train,Test Split. preprocessing, Training.png
+│   └── Evaluation and Top features.png
+│
+├── Approach 2/                       # Terminal screenshots — production pipeline
+│   ├── Feature Engineering, Preparation, train, test, preprocessing and Resampling.png
+│   ├── Optuna,Training and Optimal Threshold.png
+│   ├── Evaluation.png
+│   └── Feature Importance.png
+│
+└── backend/
+    ├── .env                          # GROQ_API_KEY, GROQ_MODEL (not committed)
+    ├── main.py                       # FastAPI app — routes, static serving, error handling
+    ├── requirements.txt
+    │
+    ├── ml/
+    │   ├── train_pipeline.py         # Full Approach 2 training script (run once)
+    │   ├── predictor.py              # Runtime: feature engineering → SHAP → risk output
+    │   ├── xgb_model.joblib          # Trained XGBoost model (216.9 KB)
+    │   ├── preprocessor.joblib       # Fitted ColumnTransformer (6.4 KB)
+    │   └── optimal_threshold.joblib  # F1-optimized threshold float (0.66)
+    │
+    ├── models/
+    │   └── schemas.py                # Pydantic v2 request/response models
+    │
+    ├── services/
+    │   └── ai_service.py             # Groq prompt builder, LLM invocation, chat handler
+    │
+    └── static/
+        └── index.html                # Full web UI (served directly by FastAPI)
 ```
 
 ---
 
-## Part 3: Environment Configuration
+## ⚙️ Setup & Running
 
-### Backend `.env`
+### Prerequisites
+- Python 3.11+
+- [`uv`](https://docs.astral.sh/uv/) — fast Python package manager
+- A [Groq API key](https://console.groq.com/) (free tier is sufficient)
+
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/NikhilJ-05/hr-attrition-system.git
+cd hr-attrition-system
+uv sync
+```
+
+### 2. Configure Environment
+
+Create `backend/.env` with your credentials:
+
 ```env
-# Required
 GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxx
-GROQ_MODEL=llama3-8b-8192
-
-# Optional (defaults shown)
+GROQ_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
 DATA_PATH=../IBM Dataset.csv
-MODEL_PATH=ml/xgb_model.joblib
-PREPROCESSOR_PATH=ml/preprocessor.joblib
-CORS_ORIGINS=http://localhost:3000
 ```
 
-### Backend `config.py`
-```python
-from pydantic_settings import BaseSettings
+### 3. Train the Model
 
-class Settings(BaseSettings):
-    groq_api_key: str
-    groq_model: str = "llama3-8b-8192"
-    data_path: str = "../IBM Dataset.csv"
-    model_path: str = "ml/xgb_model.joblib"
-    preprocessor_path: str = "ml/preprocessor.joblib"
-    cors_origins: str = "http://localhost:3000"
-
-    class Config:
-        env_file = ".env"
-
-settings = Settings()
-```
-
-### Frontend `.env.local`
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
----
-
-## Part 4: IBM Dataset Schema (Exact Columns from CSV)
-
-The IBM HR Analytics dataset has **35 columns** and **1,470 rows**. The `Attrition` column is the target variable (Yes/No).
-
-### 4.1 Columns to DROP Before Training
-These columns are constant across all rows or are simple identifiers. They provide zero predictive signal.
-
-| Column | Reason to Drop |
-|:---|:---|
-| `EmployeeNumber` | Unique ID — no predictive value |
-| `EmployeeCount` | Always = 1 for all rows |
-| `Over18` | Always = "Y" for all rows |
-| `StandardHours` | Always = 80 for all rows |
-
-### 4.2 Usable Features for ML (30 Columns After Dropping)
-*After removing the 4 constant/ID columns and the `Attrition` target, 30 features remain.*
-
-| # | Category | Column Name | Type | Range / Values | ML Notes |
-|:--|:---|:---|:---|:---|:---|
-| 1 | Demographics | `Age` | Int | 18 - 60 | Continuous, scale |
-| 2 | | `Gender` | Cat | Male, Female | OneHotEncode |
-| 3 | | `MaritalStatus` | Cat | Single, Married, Divorced | OneHotEncode |
-| 4 | Education | `Education` | Ordinal | 1 (Below College) → 5 (Doctorate) | Treat as numeric |
-| 5 | | `EducationField` | Cat | Life Sciences, Medical, Marketing, Technical Degree, HR, Other | OneHotEncode |
-| 6 | Job | `Department` | Cat | Sales, Research & Development, Human Resources | OneHotEncode |
-| 7 | | `JobRole` | Cat | 9 distinct roles (Sales Executive, Research Scientist, etc.) | OneHotEncode |
-| 8 | | `JobLevel` | Ordinal | 1 → 5 | Treat as numeric |
-| 9 | | `BusinessTravel` | Cat | Non-Travel, Travel_Rarely, Travel_Frequently | OneHotEncode |
-| 10 | | `OverTime` | Binary | Yes, No | **Top predictor** — LabelEncode to 1/0 |
-| 11 | | `DistanceFromHome` | Int | 1 - 29 | Continuous, scale |
-| 12 | Comp | `MonthlyIncome` | Int | 1,009 - 19,999 | Continuous, scale |
-| 13 | | `DailyRate` | Int | 102 - 1,499 | Continuous, scale |
-| 14 | | `HourlyRate` | Int | 30 - 100 | Continuous, scale |
-| 15 | | `MonthlyRate` | Int | 2,094 - 26,999 | Continuous, scale |
-| 16 | | `PercentSalaryHike` | Int | 11 - 25 | Continuous, scale |
-| 17 | | `StockOptionLevel` | Ordinal | 0 → 3 | Treat as numeric |
-| 18 | Tenure | `TotalWorkingYears` | Int | 0 - 40 | Continuous, scale |
-| 19 | | `YearsAtCompany` | Int | 0 - 40 | Continuous, scale |
-| 20 | | `YearsInCurrentRole` | Int | 0 - 18 | Continuous, scale |
-| 21 | | `YearsSinceLastPromotion` | Int | 0 - 15 | **Top predictor** |
-| 22 | | `YearsWithCurrManager` | Int | 0 - 17 | Continuous, scale |
-| 23 | | `NumCompaniesWorked` | Int | 0 - 9 | Continuous, scale |
-| 24 | | `TrainingTimesLastYear` | Int | 0 - 6 | Continuous, scale |
-| 25 | Satisfaction | `JobSatisfaction` | Ordinal | 1 (Low) → 4 (Very High) | Treat as numeric |
-| 26 | | `EnvironmentSatisfaction` | Ordinal | 1 → 4 | Treat as numeric |
-| 27 | | `RelationshipSatisfaction` | Ordinal | 1 → 4 | Treat as numeric |
-| 28 | | `WorkLifeBalance` | Ordinal | 1 (Bad) → 4 (Best) | Treat as numeric |
-| 29 | | `JobInvolvement` | Ordinal | 1 → 4 | Treat as numeric |
-| 30 | | `PerformanceRating` | Ordinal | 3 or 4 (in this dataset) | Treat as numeric |
-
-### 4.3 Target Column
-| Column | Type | Values | Notes |
-|:---|:---|:---|:---|
-| `Attrition` | Binary | "Yes" (237 rows, ~16%) / "No" (1,233 rows, ~84%) | Used ONLY during model training. Class-imbalanced. |
-
-### 4.4 Runtime Output Columns (Computed at request time, NOT in CSV)
-| Column Name | Type | Generated By | Description |
-|:---|:---|:---|:---|
-| `AttritionRiskScore` | Float (0-100) | XGBoost `predict_proba` | Probability of attrition. |
-| `RiskTier` | Categorical | Simple Math | `High` (>70%), `Medium` (40-70%), `Low` (<40%) |
-| `TopRiskFactors` | List[dict] | SHAP Explainer | Top 5 features driving the score up or down. |
-| `InsightReport` | String | Groq LLM | Executive summary of the risk pattern. |
-| `RetentionStrategies` | List[String] | Groq LLM | 3 actionable interventions for the manager. |
-
-### 4.5 IBM Dataset Class Distribution
-```
-Attrition = "No":  1,233 employees (83.9%)
-Attrition = "Yes":   237 employees (16.1%)
-```
-This natural ~16% attrition rate is realistic for corporate environments. It must be handled via `scale_pos_weight` during XGBoost training.
-
----
-
-## Part 5: ML Pipeline Specification
-
-### 5.1 Data Loading & Cleaning
-
-```python
-import pandas as pd
-
-# Load the IBM dataset
-df = pd.read_csv('../IBM Dataset.csv')
-
-# Drop constant/useless columns
-DROP_COLS = ['EmployeeNumber', 'EmployeeCount', 'Over18', 'StandardHours']
-df = df.drop(columns=DROP_COLS)
-
-# Separate features and target
-X = df.drop(columns=['Attrition'])
-y = df['Attrition'].map({'Yes': 1, 'No': 0})
-```
-
-### 5.2 Preprocessing (`ColumnTransformer`)
-
-```python
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-
-# Columns from the IBM dataset (after dropping constant cols)
-NUMERIC_COLS = [
-    'Age', 'DailyRate', 'DistanceFromHome', 'HourlyRate',
-    'MonthlyIncome', 'MonthlyRate', 'NumCompaniesWorked',
-    'PercentSalaryHike', 'TotalWorkingYears', 'TrainingTimesLastYear',
-    'YearsAtCompany', 'YearsInCurrentRole', 'YearsSinceLastPromotion',
-    'YearsWithCurrManager',
-    # Ordinals treated as numeric:
-    'Education', 'EnvironmentSatisfaction', 'JobInvolvement',
-    'JobLevel', 'JobSatisfaction', 'PerformanceRating',
-    'RelationshipSatisfaction', 'StockOptionLevel', 'WorkLifeBalance'
-]
-
-CATEGORICAL_COLS = [
-    'BusinessTravel', 'Department', 'EducationField',
-    'Gender', 'JobRole', 'MaritalStatus', 'OverTime'
-]
-
-preprocessor = ColumnTransformer(transformers=[
-    ('num', StandardScaler(), NUMERIC_COLS),
-    ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), CATEGORICAL_COLS)
-])
-```
-
-### 5.3 Model Training
-
-```python
-import xgboost as xgb
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, roc_auc_score
-import joblib
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, stratify=y, random_state=42
-)
-
-# Handle class imbalance
-scale_pos = (y_train == 0).sum() / (y_train == 1).sum()
-
-# Preprocess
-X_train_processed = preprocessor.fit_transform(X_train)
-X_test_processed = preprocessor.transform(X_test)
-
-# Train
-model = xgb.XGBClassifier(
-    n_estimators=200,
-    max_depth=5,
-    learning_rate=0.1,
-    eval_metric='logloss',
-    scale_pos_weight=scale_pos,
-    use_label_encoder=False,
-    random_state=42
-)
-model.fit(X_train_processed, y_train)
-
-# Evaluate — PRIORITIZE RECALL for the minority class (Attrition=Yes)
-y_pred = model.predict(X_test_processed)
-y_proba = model.predict_proba(X_test_processed)[:, 1]
-
-print(classification_report(y_test, y_pred))
-print(f"ROC-AUC: {roc_auc_score(y_test, y_proba):.4f}")
-
-# Serialize
-joblib.dump(model, 'ml/xgb_model.joblib')
-joblib.dump(preprocessor, 'ml/preprocessor.joblib')
-```
-
-### 5.4 SHAP Explanation Logic (`predictor.py`)
-
-```python
-import shap
-import pandas as pd
-
-def explain_prediction(model, preprocessor, employee_row_df: pd.DataFrame):
-    """
-    Takes a single employee's raw features (as a 1-row DataFrame),
-    preprocesses them, runs XGBoost inference, and extracts SHAP explanations.
-
-    Returns:
-        risk_score: float (0-100)
-        risk_tier: str ("High", "Medium", "Low")
-        top_factors: list[dict]
-    """
-    # Preprocess
-    X_processed = preprocessor.transform(employee_row_df)
-
-    # Predict
-    risk_score = float(model.predict_proba(X_processed)[0][1]) * 100
-
-    # Tier assignment
-    if risk_score > 70:
-        risk_tier = "High"
-    elif risk_score > 40:
-        risk_tier = "Medium"
-    else:
-        risk_tier = "Low"
-
-    # SHAP
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X_processed)
-
-    # Map SHAP values back to feature names
-    feature_names = preprocessor.get_feature_names_out()
-    shap_dict = dict(zip(feature_names, shap_values[0]))
-
-    # Sort by absolute impact and take top 5
-    sorted_factors = sorted(shap_dict.items(), key=lambda x: abs(x[1]), reverse=True)[:5]
-
-    top_factors = []
-    for feat_name, impact in sorted_factors:
-        clean_name = feat_name.replace("num__", "").replace("cat__", "").replace("_", "=", 1)
-        direction = "+" if impact > 0 else "-"
-        top_factors.append({
-            "feature": clean_name,
-            "impact": f"{direction}{abs(impact):.1%}"
-        })
-
-    return risk_score, risk_tier, top_factors
-```
-
----
-
-## Part 6: Pydantic Request/Response Models (`schemas.py`)
-
-```python
-from pydantic import BaseModel
-
-# --- Dashboard ---
-class DashboardSummary(BaseModel):
-    active_headcount: int
-    avg_risk_score: float
-    high_risk_count: int
-    medium_risk_count: int
-    low_risk_count: int
-    avg_tenure: float
-    estimated_turnover_cost: float
-
-class DepartmentRisk(BaseModel):
-    department: str
-    avg_risk_score: float
-    employee_count: int
-
-# --- Employee ---
-class EmployeeBase(BaseModel):
-    employee_number: int
-    age: int
-    department: str
-    job_role: str
-    job_level: int
-    monthly_income: int
-    performance_rating: int
-    years_at_company: int
-    over_time: str
-    risk_score: float | None = None
-    risk_tier: str | None = None
-
-class EmployeeDetail(EmployeeBase):
-    gender: str
-    marital_status: str
-    education: int
-    education_field: str
-    business_travel: str
-    distance_from_home: int
-    daily_rate: int
-    hourly_rate: int
-    monthly_rate: int
-    percent_salary_hike: int
-    stock_option_level: int
-    total_working_years: int
-    years_in_current_role: int
-    years_since_last_promotion: int
-    years_with_curr_manager: int
-    num_companies_worked: int
-    training_times_last_year: int
-    job_satisfaction: int
-    environment_satisfaction: int
-    relationship_satisfaction: int
-    work_life_balance: int
-    job_involvement: int
-
-# --- Analysis ---
-class RiskDriver(BaseModel):
-    feature: str
-    impact: str
-
-class MLAnalysis(BaseModel):
-    risk_score: float
-    risk_tier: str
-    top_drivers: list[RiskDriver]
-
-class AIInsights(BaseModel):
-    risk_narrative: str
-    retention_strategies: list[str]
-
-class FullAnalysisResponse(BaseModel):
-    employee_number: int
-    ml_analysis: MLAnalysis
-    ai_insights: AIInsights
-
-# --- Simulation ---
-class SimulationRequest(BaseModel):
-    """Only include fields the user wants to change."""
-    monthly_income: int | None = None
-    percent_salary_hike: int | None = None
-    over_time: str | None = None
-    job_level: int | None = None
-    work_life_balance: int | None = None
-    distance_from_home: int | None = None
-    years_since_last_promotion: int | None = None
-    job_satisfaction: int | None = None
-    environment_satisfaction: int | None = None
-
-class SimulationResponse(BaseModel):
-    original_risk_score: float
-    new_risk_score: float
-    delta: float
-```
-
----
-
-## Part 7: The Groq System Prompt Template
-
-```text
-You are an expert HR Business Partner and Retention Strategist.
-
-EMPLOYEE CONTEXT:
-Employee #: {EmployeeNumber}
-Job Role: {JobRole} in {Department}
-Job Level: {JobLevel}/5 | Tenure: {YearsAtCompany} years
-Monthly Income: ${MonthlyIncome} | Last Hike: {PercentSalaryHike}%
-Performance: {PerformanceRating}/4 | Work-Life Balance: {WorkLifeBalance}/4
-Overtime: {OverTime} | Distance from Home: {DistanceFromHome} km
-Job Satisfaction: {JobSatisfaction}/4 | Environment Satisfaction: {EnvironmentSatisfaction}/4
-
-PREDICTIVE ML DIAGNOSIS:
-Current Flight Risk: {RiskScore}% ({RiskTier})
-
-THE "WHY" (Mathematical Risk Drivers from SHAP):
-The Machine Learning model specifically identified these factors as the primary
-reasons pushing this employee's risk score higher:
-{SHAP_Top_Risk_Factors_Formatted}
-
-TASK:
-Provide a concise, 2-section response. Do not use filler introductions.
-Use specific numbers from the context above.
-
-1. "Risk Narrative": A 2-3 sentence executive summary explaining the risk
-   situation based ONLY on the provided metrics and SHAP drivers.
-
-2. "Retention Strategy": A bulleted list of exactly 3 highly specific,
-   actionable, and cost-effective interventions a manager should take
-   immediately. Each intervention MUST directly address one of the SHAP
-   drivers listed above.
-```
-
-### Groq SDK Invocation
-
-```python
-from groq import Groq
-import json
-
-client = Groq(api_key=settings.groq_api_key)
-
-def generate_insights(prompt: str) -> dict:
-    response = client.chat.completions.create(
-        model=settings.groq_model,
-        messages=[
-            {"role": "system", "content": "You are an expert HR strategist. Respond in valid JSON with keys: risk_narrative (string), retention_strategies (array of 3 strings)."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.4,
-        max_tokens=600,
-        response_format={"type": "json_object"}
-    )
-    return json.loads(response.choices[0].message.content)
-```
-
----
-
-## Part 8: API Endpoint Specifications
-
-### `GET /api/dashboard/summary`
-- **Purpose**: Global KPIs for the dashboard home.
-- **Logic**: Run batch `predict_proba` on all 1,470 employees, aggregate counts by tier.
-- **Response**: `DashboardSummary`
-- **Caching**: Cache result for 5 minutes.
-
-### `GET /api/dashboard/department-risks`
-- **Purpose**: Risk breakdown by department for bar chart.
-- **Response**: `list[DepartmentRisk]`
-
-### `GET /api/employees?skip=0&limit=20&department=Sales&risk_tier=High`
-- **Purpose**: Paginated employee directory with filters.
-- **Response**: `{ "employees": list[EmployeeBase], "total": int }`
-
-### `GET /api/employees/{employee_number}`
-- **Purpose**: Full detail view for a single employee (no ML, just raw data).
-- **Response**: `EmployeeDetail`
-
-### `POST /api/employees/{employee_number}/analyze`
-- **Purpose**: The heavy lifter. Runs XGBoost → SHAP → Groq LLM.
-- **Latency**: ~2-4 seconds (dominated by LLM call).
-- **Response**: `FullAnalysisResponse`
-- **Caching**: Cache LLM results for 1 hour per employee.
-
-### `POST /api/employees/{employee_number}/simulate`
-- **Purpose**: What-If sandbox. Runs only XGBoost (no SHAP, no LLM).
-- **Latency**: <200ms (pure model inference).
-- **Body**: `SimulationRequest`
-- **Response**: `SimulationResponse`
-
----
-
-## Part 9: Frontend Construction (Next.js)
-
-### 9.1 Route: `page.tsx` (Global Dashboard)
-
-| Component | Data Source | Visual |
-|:---|:---|:---|
-| 4x KPI Cards | `GET /api/dashboard/summary` | Active Headcount, Avg Flight Risk %, High-Risk Count, Avg Tenure |
-| Department Risk Chart | `GET /api/dashboard/department-risks` | `recharts` BarChart for Sales, R&D, HR |
-| "Urgent Action" Table | `GET /api/employees?risk_tier=High&limit=5` | Sorted by risk score desc. Clickable → `/employees/[id]` |
-
-### 9.2 Route: `employees/page.tsx` (Directory)
-
-| Component | Behavior |
-|:---|:---|
-| Search Bar | Client-side filter by Employee Number |
-| Department Filter | Dropdown (Sales, R&D, HR) |
-| Risk Tier Filter | Toggle buttons (All / High / Medium / Low) |
-| Data Table Cols | Employee #, Role, Dept, Income, Performance, Risk Tier (colored badge) |
-| Row Click | Navigates to `/employees/[id]` |
-
-### 9.3 Route: `employees/[id]/page.tsx` (The Intelligence Profile)
-
-This is the **core deliverable**. It renders 4 visual blocks:
-
-#### Block 1: The Diagnostic Gauge
-- Circular progress bar showing 0-100% `AttritionRiskScore`.
-- Color: Green (<40%) → Yellow (40-70%) → Red (>70%).
-
-#### Block 2: The "Why" Breakdown (SHAP)
-- Horizontal bar chart (`recharts`).
-- Bars extend left (reduces risk) or right (increases risk).
-
-#### Block 3: The AI Prescription
-- Visually distinct card with gradient border.
-- `risk_narrative` as paragraph, `retention_strategies` as numbered list.
-- "Regenerate" button for a fresh LLM response.
-
-#### Block 4: The "What-If" Sandbox
-- **Sliders** for: `PercentSalaryHike` (11-25), `WorkLifeBalance` (1-4), `DistanceFromHome` (1-29), `YearsSinceLastPromotion` (0-15), `JobSatisfaction` (1-4), `EnvironmentSatisfaction` (1-4).
-- **Toggle** for: `OverTime` (Yes/No).
-- **Dropdown** for: `JobLevel` (1-5).
-- On change (debounced 300ms), call `POST /api/employees/{id}/simulate`.
-- Display "Current Score" alongside "Projected Score" with delta.
-
----
-
-## Part 10: Error Handling & Edge Cases
-
-### Backend
-| Scenario | Handling |
-|:---|:---|
-| Employee Number not found | Return `404` |
-| Groq API key missing/invalid | Return `503`, log error |
-| Groq rate limited | Retry with exponential backoff (max 3) |
-| Groq returns malformed JSON | Catch error, return `500` with fallback message |
-| `.joblib` file missing | Fail on startup with clear error |
-| Invalid simulation values | Pydantic auto-rejects with `422` |
-
-### Frontend
-| Scenario | Handling |
-|:---|:---|
-| API unreachable | Toast: "Backend unavailable" |
-| `/analyze` takes > 5s | Skeleton loader with "Generating AI insights..." |
-| `/simulate` fails | Revert slider, show error toast |
-
----
-
-## Part 11: Testing Strategy
-
-### Backend Unit Tests (`pytest`)
-| Test | Validates |
-|:---|:---|
-| `test_data_loads` | IBM CSV loads correctly with 35 columns, 1470 rows |
-| `test_dropped_columns` | `EmployeeCount`, `Over18`, `StandardHours` are removed |
-| `test_model_loads` | `.joblib` files load without error |
-| `test_prediction_range` | `predict_proba` always between 0.0 and 1.0 |
-| `test_shap_output_length` | SHAP returns exactly 5 top factors |
-| `test_risk_tier_logic` | 85 → "High", 50 → "Medium", 20 → "Low" |
-| `test_simulation_delta` | Changing `OverTime` Yes→No reduces the score |
-
-### Run Command
 ```bash
-cd backend
-pytest tests/ -v --tb=short
+uv run python backend/ml/train_pipeline.py
 ```
 
----
+This executes the full Approach 2 pipeline — feature engineering, SMOTE-ENN resampling, Optuna search (50 trials), threshold sweep — and saves three `.joblib` artifacts to `backend/ml/`.
 
-## Part 12: Deployment Guide
+Expected terminal output confirms: **ROC-AUC ≈ 0.81**, **Attrition Recall ≈ 0.68**, **Optimal Threshold = 0.66**.
 
-### Local Development
+> ⚠️ The server will refuse to start if the `.joblib` files are missing. Always train before running.
+
+### 4. Start the Server
+
 ```bash
-# Terminal 1: Backend
-cd backend
-python -m venv venv
-venv\Scripts\activate          # Windows
-pip install -r requirements.txt
-python ml/train_pipeline.py    # Train model on IBM Dataset.csv
-uvicorn main:app --reload --port 8000
-
-# Terminal 2: Frontend
-cd frontend
-npm install
-npm run dev                    # http://localhost:3000
+uv run python run.py
 ```
 
-### Production (Docker Compose)
-```yaml
-version: "3.9"
-services:
-  backend:
-    build: ./backend
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/.env
-    volumes:
-      - ./IBM Dataset.csv:/app/IBM Dataset.csv:ro
+`run.py` launches `uvicorn` pointed at the `backend/` directory as its working directory, ensuring all relative paths (to the dataset and `.joblib` artifacts) resolve correctly.
 
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
-    depends_on:
-      - backend
-```
+- **Web UI:** http://localhost:8000
+- **API Docs:** http://localhost:8000/docs
+- **SHAP Waterfall:** http://localhost:8000/waterfall
 
 ---
 
-## Part 13: Execution Checklist for the Next Agent
+## 📊 Training Terminal Screenshots
 
-- [ ] **Step 1**: Create the `backend/` directory structure as shown in Part 2.
-- [ ] **Step 2**: Create `requirements.txt`: `fastapi uvicorn pandas numpy scikit-learn xgboost shap groq joblib pydantic-settings python-dotenv`.
-- [ ] **Step 3**: Create `.env` with the `GROQ_API_KEY`.
-- [ ] **Step 4**: Write `train_pipeline.py` using Part 5. Train on `IBM Dataset.csv`. Verify ROC-AUC > 0.75. Save `.joblib` files. **No synthetic data generation needed.**
-- [ ] **Step 5**: Write `predictor.py` following Part 5.4.
-- [ ] **Step 6**: Write `schemas.py` following Part 6.
-- [ ] **Step 7**: Write `ai_service.py` following Part 7.
-- [ ] **Step 8**: Write `main.py` and routers following Part 8. Start server, test all endpoints.
-- [ ] **Step 9**: Initialize Next.js in `frontend/`. Install `tailwindcss`, `recharts`.
-- [ ] **Step 10**: Build the Dashboard page (Part 9.1).
-- [ ] **Step 11**: Build the Employee Directory (Part 9.2).
-- [ ] **Step 12**: Build the Employee Intelligence Profile with all 4 blocks (Part 9.3).
-- [ ] **Step 13**: Run all tests (Part 11). Fix any failures.
-- [ ] **Step 14**: Verify full end-to-end: Dashboard → Click Employee → View Analysis → Use Sandbox.
+<details>
+<summary><b>Approach 1 — Baseline Pipeline</b></summary>
+<br>
 
-> **CRITICAL**: Do not skip steps. Do not proceed to Step 5 until Step 4 produces valid `.joblib` files. Do not start the frontend until all backend endpoints return valid responses.
+![Train/Test Split, Preprocessing, Training](./Approach%201/Train,Test%20Split.%20preprocessing,%20Training.png)
+
+![Evaluation and Top Features](./Approach%201/Evaluation%20and%20Top%20features.png)
+
+</details>
+
+<details>
+<summary><b>Approach 2 — Production Pipeline</b></summary>
+<br>
+
+![Feature Engineering, Preparation, Train/Test Split, Preprocessing and Resampling](./Approach%202/Feature%20Engineering,%20Preparation,%20train,%20test,%20preprocessing%20and%20Resampling.png)
+
+![Optuna, Training and Optimal Threshold](./Approach%202/Optuna,Training%20and%20Optimal%20Threshold.png)
+
+![Evaluation](./Approach%202/Evaluation.png)
+
+![Feature Importance](./Approach%202/Feature%20Importance.png)
+
+</details>
+
+---
+
+## 🗺️ Skills Demonstrated
+
+| Area | What Was Built |
+|:---|:---|
+| **ML Engineering** | End-to-end pipeline from raw CSV to production `.joblib` artifacts — data cleaning, preprocessing, training, evaluation, serialization |
+| **Imbalanced Classification** | SMOTE-ENN resampling + `scale_pos_weight` + optimal threshold selection via F1-sweep |
+| **Feature Engineering** | 6 domain-derived features informed by HR domain knowledge; validated by landing in the top-6 feature importances |
+| **Hyperparameter Optimization** | Optuna Bayesian search (TPE) with stratified cross-validation, targeting minority-class F1 |
+| **Explainable AI (XAI)** | SHAP TreeExplainer with grouped one-hot feature aggregation and full waterfall data for frontend rendering |
+| **Generative AI Integration** | Groq LLM API with structured JSON prompting, graceful error handling, and stateful multi-turn chat |
+| **REST API Design** | FastAPI with Pydantic v2 schemas, clear separation of concerns across routes, and a robust fallback chain |
+| **Full-Stack Delivery** | Single-server deployment — backend + web UI served from one process, no separate build pipeline |
+
+---
+
+## 📄 Dataset
+
+**IBM HR Analytics Employee Attrition & Performance**
+- Source: [Kaggle](https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset)
+- Rows: 1,470 employees | Columns: 35 features
+- Target: `Attrition` — Yes: 237 (16.1%) / No: 1,233 (83.9%)
